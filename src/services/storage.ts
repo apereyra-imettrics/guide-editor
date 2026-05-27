@@ -10,18 +10,6 @@ export const storage = {
     if (!data) return { guides: [], folders: [] };
     try {
       const parsed = JSON.parse(data);
-      if (!parsed.folders || parsed.folders.length === 0) {
-        // Create a default root folder so the UI always has at least one folder
-        const rootFolder = {
-          id: uuidv4(),
-          name: 'Root',
-          parentId: null,
-        };
-        parsed.folders = [rootFolder];
-        parsed.guides = [];
-        // Persist the new default store
-        this.saveStore({ guides: parsed.guides, folders: parsed.folders });
-      }
       return {
         guides: parsed.guides || [],
         folders: parsed.folders || [],

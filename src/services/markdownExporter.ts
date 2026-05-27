@@ -1,5 +1,5 @@
 // Markdown Exporter Service
-import { storage } from "../services/storage";
+import { storage } from "./storage";
 import { CollapsibleBlock, CollapsibleSection, CollapsibleSummary, CollapsibleContent } from "../components/Editor/extensions/CollapsibleExtension";
 import { CalloutExtension } from "../components/Editor/extensions/CalloutExtension";
 import { Editor } from "@tiptap/core";
