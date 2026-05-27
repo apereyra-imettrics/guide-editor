@@ -1,5 +1,6 @@
-import type { Guide, GuideStore, Folder } from "../types";
 import { v4 as uuidv4 } from "uuid";
+import type { Folder, Guide, GuideStore } from "../types";
+
 
 const STORAGE_KEY = "ga4_measurement_guides";
 
@@ -9,12 +10,26 @@ export const storage = {
     if (!data) return { guides: [], folders: [] };
     try {
       const parsed = JSON.parse(data);
+      if (!parsed.folders || parsed.folders.length === 0) {
+        // Create a default root folder so the UI always has at least one folder
+        const rootFolder = {
+          id: uuidv4(),
+          name: 'Root',
+          parentId: null,
+        };
+        parsed.folders = [rootFolder];
+        parsed.guides = [];
+        // Persist the new default store
+        this.saveStore({ guides: parsed.guides, folders: parsed.folders });
+      }
       return {
         guides: parsed.guides || [],
-        folders: parsed.folders || []
+        folders: parsed.folders || [],
       };
     } catch (e) {
       console.error("Error parsing storage", e);
+      // If the stored data is corrupted, clear it to avoid app crash
+      localStorage.removeItem(STORAGE_KEY);
       return { guides: [], folders: [] };
     }
   },
@@ -68,17 +83,35 @@ export const storage = {
     this.saveStore(store);
   },
 
+  clearStore() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.error('Error clearing storage', e);
+    }
+  },
+
+  // Delete a folder and all its contents (nested folders and guides)
   deleteFolder(id: string) {
     const store = this.getStore();
-    // Delete folder and recursively delete children? 
-    // For now: delete folder and move children to parent or root
-    const folder = store.folders.find(f => f.id === id);
-    const newParentId = folder?.parentId || null;
 
-    store.folders = store.folders.filter((f) => f.id !== id);
-    store.folders = store.folders.map(f => f.parentId === id ? { ...f, parentId: newParentId } : f);
-    store.guides = store.guides.map(g => g.folderId === id ? { ...g, folderId: newParentId } : g);
-    
+    // Helper to recursively collect all folder IDs to delete
+    const collectFolderIds = (folderId: string): string[] => {
+      const ids = [folderId];
+      const children = store.folders.filter(f => f.parentId === folderId);
+      children.forEach(c => {
+        ids.push(...collectFolderIds(c.id));
+      });
+      return ids;
+    };
+
+    const foldersToDelete = collectFolderIds(id);
+
+    // Remove all collected folders
+    store.folders = store.folders.filter(f => !foldersToDelete.includes(f.id));
+    // Remove all guides belonging to any of those folders
+    store.guides = store.guides.filter(g => !g.folderId || !foldersToDelete.includes(g.folderId));
+
     this.saveStore(store);
   },
 

@@ -1,19 +1,9 @@
-import React, {
+import {
   useState,
   useEffect,
   forwardRef,
   useImperativeHandle,
 } from 'react'
-import { 
-  Type, 
-  Heading1, 
-  Heading2, 
-  Heading3, 
-  Table, 
-  Info, 
-  BadgeCheck, 
-  Code2 
-} from 'lucide-react'
 
 export const MenuList = forwardRef((props: any, ref) => {
   const [selectedIndex, setSelectedIndex] = useState(0)

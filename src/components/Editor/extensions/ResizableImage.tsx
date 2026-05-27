@@ -168,7 +168,7 @@ export const ResizableImage = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const { src, alt, caption, width } = node.attrs;
+    const { caption, width } = node.attrs;
     return [
       'figure', 
       { style: 'display: flex; flex-direction: column; align-items: center; margin: 2rem 0;' },
@@ -179,13 +179,13 @@ export const ResizableImage = Node.create({
 
   addCommands() {
     return {
-      setImage: (options) => ({ commands }) => {
+      setImage: (options: any) => ({ commands }: any) => {
         return commands.insertContent({
           type: this.name,
           attrs: options,
         })
       },
-    }
+    } as any
   },
 
   addNodeView() {

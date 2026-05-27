@@ -10,10 +10,9 @@ interface Heading {
 
 interface TableOfContentsProps {
   content: JSONContent;
-  onItemClick: (text: string) => void;
 }
 
-export const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onItemClick }) => {
+export const TableOfContents: React.FC<TableOfContentsProps> = ({ content }) => {
   const getHeadings = (nodes: any[]): Heading[] => {
     const headings: Heading[] = [];
     

@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
-import React, { useState, useRef } from 'react'
+
 import { Plus, Trash2 } from 'lucide-react'
 import type { ParameterRow } from '../../../types'
 
@@ -9,7 +9,14 @@ const ParameterTableComponent = ({ node, updateAttributes, editor, getPos }: any
     { parameter: '', value: '', type: '' }
   ]
   
-  const colWidths = node.attrs.columnWidths || [33, 33, 34];
+  let colWidths = node.attrs.columnWidths || [33, 33, 34];
+  if (typeof colWidths === 'string') {
+    try {
+      colWidths = JSON.parse(colWidths);
+    } catch {
+      colWidths = colWidths.split(',').map(Number);
+    }
+  }
 
   const updateRow = (index: number, field: keyof ParameterRow, value: string) => {
     const newRows = [...rows]
@@ -150,6 +157,22 @@ export const ParameterTableExtension = Node.create({
       },
       columnWidths: {
         default: [33, 33, 34],
+        parseHTML: element => {
+          const widths = element.getAttribute('columnwidths') || element.getAttribute('columnWidths');
+          if (widths) {
+            try {
+              return JSON.parse(widths);
+            } catch (e) {
+              return widths.split(',').map(Number);
+            }
+          }
+          return [33, 33, 34];
+        },
+        renderHTML: attributes => {
+          return {
+            columnwidths: JSON.stringify(attributes.columnWidths),
+          };
+        }
       }
     }
   },

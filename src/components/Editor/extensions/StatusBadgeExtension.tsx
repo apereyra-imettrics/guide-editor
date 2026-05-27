@@ -1,6 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
-import React from 'react';
 import { Trash2 } from 'lucide-react';
 
 // Component responsible for rendering the badge and handling click to cycle states

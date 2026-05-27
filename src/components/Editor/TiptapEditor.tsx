@@ -25,12 +25,14 @@ interface TiptapEditorProps {
   initialContent?: JSONContent;
   initialMarkdown?: string;
   onChange: (content: JSONContent) => void;
+  editable?: boolean;
 }
 
 export const TiptapEditor = ({
   initialContent,
   initialMarkdown,
   onChange,
+  editable = true,
 }: TiptapEditorProps) => {
   const editor = useEditor({
     extensions: [
@@ -71,6 +73,7 @@ export const TiptapEditor = ({
       }),
     ],
     content: initialContent || { type: "doc", content: [{ type: "paragraph" }] },
+    editable,
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON());
     },
@@ -80,6 +83,12 @@ export const TiptapEditor = ({
       },
     },
   })
+
+  useEffect(() => {
+    if (editor && editable !== undefined) {
+      editor.setEditable(editable);
+    }
+  }, [editable, editor]);
 
   useEffect(() => {
     if (initialMarkdown && editor && editor.isEmpty) {

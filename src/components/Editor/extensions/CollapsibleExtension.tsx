@@ -1,6 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react';
-import React from 'react';
 import { Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 
 /**
@@ -52,7 +51,10 @@ export const CollapsibleBlock = Node.create({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (typeof getPos === 'function') {
-                    editor.commands.deleteRange({ from: getPos(), to: getPos() + node.nodeSize });
+                    const pos = getPos();
+                    if (typeof pos === 'number') {
+                      editor.commands.deleteRange({ from: pos, to: pos + node.nodeSize });
+                    }
                   }
                 }}
                 className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 transition-all rounded-md hover:bg-white/50"

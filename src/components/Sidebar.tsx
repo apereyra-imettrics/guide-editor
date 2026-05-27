@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FolderPlus, FilePlus, ChevronRight, ChevronDown, Folder, FileText, Search, MoreVertical, Plus, Copy, Trash2, Edit2 } from "lucide-react";
+import { FolderPlus, ChevronRight, ChevronDown, Folder, FileText, Search, MoreVertical, Plus, Copy, Trash2, Edit2, Home } from "lucide-react";
 import { storage } from "../services/storage";
 import type { Guide, Folder as FolderType } from "../types";
 import { v4 as uuidv4 } from "uuid";
@@ -9,15 +9,30 @@ interface SidebarProps {
   onSelectGuide: (id: string) => void;
   activeGuideId: string | null;
   onNewGuide: (folderId?: string | null) => void;
+  onGoHome: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onSelectGuide, activeGuideId, onNewGuide }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onSelectGuide, activeGuideId, onNewGuide, onGoHome }) => {
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [search, setSearch] = useState("");
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem("expanded_folders");
+    if (stored) {
+      try {
+        return new Set(JSON.parse(stored));
+      } catch (e) {
+        return new Set();
+      }
+    }
+    return new Set();
+  });
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: 'guide' | 'folder' } | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem("expanded_folders", JSON.stringify(Array.from(expandedFolders)));
+  }, [expandedFolders]);
 
   const refreshData = () => {
     setFolders(storage.getFolders());
@@ -91,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectGuide, activeGuideId, 
   };
 
   const handleDeleteFolder = (id: string) => {
-    if (confirm("¿Eliminar carpeta? Los documentos se moverán al nivel superior.")) {
+    if (confirm("¿Eliminar carpeta? Se eliminarán también todas las subcarpetas y guías que contenga de forma permanente.")) {
       storage.deleteFolder(id);
       refreshData();
     }
@@ -246,15 +261,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectGuide, activeGuideId, 
     <aside className="w-64 h-screen border-r border-slate-200 bg-white flex flex-col no-print shrink-0 overflow-hidden">
       <div className="p-4 border-b border-slate-100">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-slate-900 flex items-center gap-2">
+          <h2 
+            onClick={onGoHome}
+            className="font-bold text-slate-900 flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
+            title="Ir al Inicio"
+          >
             <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center text-white text-xs">GA</div>
-            Guías GA4
+            <span>Guías GA4</span>
           </h2>
-          <Tooltip label="Nueva Carpeta Raíz" position="bottom">
-            <ActionIcon variant="light" color="blue" onClick={() => handleCreateFolder(null)}>
-              <FolderPlus size={18} />
-            </ActionIcon>
-          </Tooltip>
+          <div className="flex gap-1">
+            <Tooltip label="Ir al Inicio" position="bottom">
+              <ActionIcon variant="subtle" color="slate" onClick={onGoHome}>
+                <Home size={18} className="text-slate-500 hover:text-blue-600 transition-colors" />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Nueva Carpeta Raíz" position="bottom">
+              <ActionIcon variant="light" color="blue" onClick={() => handleCreateFolder(null)}>
+                <FolderPlus size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </div>
         </div>
         <TextInput
           placeholder="Buscar guías..."

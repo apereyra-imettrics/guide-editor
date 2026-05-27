@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FileDown, Code, ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { FileDown, Download, ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { TiptapEditor } from "../components/Editor/TiptapEditor";
 import { TableOfContents } from "../components/Editor/TableOfContents";
 import type { Guide, ParameterRow } from "../types";
@@ -23,15 +23,30 @@ interface EditorPageProps {
 
 export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown, onBack }) => {
   const [guide, setGuide] = useState<Guide | null>(null);
-  const [isTocOpen, setIsTocOpen] = useState(true);
+  const [isTocOpen, setIsTocOpen] = useState(() => {
+    const stored = localStorage.getItem('isTocOpen');
+    return stored !== null ? JSON.parse(stored) : true;
+  });
   const [tocWidth, setTocWidth] = useState(256);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const g = storage.getGuide(guideId);
     if (g) {
       setGuide(g);
+      // If the guide is brand new and has no title or content nodes, start in edit mode
+      if (!g.title) {
+        setIsEditing(true);
+      } else {
+        setIsEditing(false);
+      }
     }
   }, [guideId]);
+
+  // Save TOC open state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('isTocOpen', JSON.stringify(isTocOpen));
+  }, [isTocOpen]);
 
   const debouncedSave = useCallback(
     debounce((updatedGuide: Guide) => {
@@ -61,39 +76,169 @@ export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown
   const handleExportJSON = () => {
     if (!guide) return;
 
-    const events: any[] = [];
+    const nodes = guide.content?.content || [];
+    
+    // We want to export a structured, comprehensive representation of the full guide,
+    // translating all custom nodes, headings, paragraphs, lists, tables, callouts, and codeBlocks.
+    
+    const getPlainNodeText = (node: any): string => {
+      if (!node) return "";
+      if (node.type === "text" && node.text) return node.text;
+      if (node.content && Array.isArray(node.content)) {
+        return node.content.map(getPlainNodeText).join("");
+      }
+      return "";
+    };
+
+    const parseContentBlocks = (blocks: any[]): any[] => {
+      const parsed: any[] = [];
+      
+      const traverse = (node: any) => {
+        if (!node) return;
+
+        // Custom callout block
+        if (node.type === "callout") {
+          parsed.push({
+            type: "callout",
+            style: node.attrs?.type || "info",
+            text: getPlainNodeText(node).trim()
+          });
+          return;
+        }
+
+        // Custom parameter table block
+        if (node.type === "parameterTable") {
+          const rows: ParameterRow[] = node.attrs?.rows ? JSON.parse(node.attrs.rows as string) : [];
+          parsed.push({
+            type: "parameterTable",
+            parameters: rows.map(r => ({
+              param: r.parameter,
+              value: r.value,
+              type: r.type
+            }))
+          });
+          return;
+        }
+
+        // Custom collapsible/details block
+        if (node.type === "collapsibleBlock") {
+          parsed.push({
+            type: "collapsible",
+            title: node.attrs?.title || "Ver detalles",
+            content: getPlainNodeText(node).trim()
+          });
+          return;
+        }
+
+        // General headings (H1, H2, H3, H4, etc.)
+        if (node.type === "heading") {
+          parsed.push({
+            type: "heading",
+            level: node.attrs?.level || 1,
+            text: getPlainNodeText(node).trim()
+          });
+          return;
+        }
+
+        // Paragraphs
+        if (node.type === "paragraph") {
+          const text = getPlainNodeText(node).trim();
+          if (text) {
+            parsed.push({
+              type: "paragraph",
+              text: text
+            });
+          }
+          return;
+        }
+
+        // Code blocks
+        if (node.type === "codeBlock") {
+          parsed.push({
+            type: "codeBlock",
+            language: node.attrs?.language || "",
+            code: getPlainNodeText(node)
+          });
+          return;
+        }
+
+        // Bullet or Ordered lists
+        if (node.type === "bulletList" || node.type === "orderedList") {
+          const items: string[] = [];
+          if (node.content && Array.isArray(node.content)) {
+            node.content.forEach((li: any) => {
+              if (li.type === "listItem") {
+                items.push(getPlainNodeText(li).trim());
+              }
+            });
+          }
+          parsed.push({
+            type: node.type === "bulletList" ? "unorderedList" : "orderedList",
+            items: items
+          });
+          return;
+        }
+
+        // If it is a generic wrapper node or a custom block, dig deeper
+        if (node.content && Array.isArray(node.content)) {
+          node.content.forEach(traverse);
+        }
+      };
+
+      blocks.forEach(traverse);
+      return parsed;
+    };
+
+    // Standard structural payload for downstream usage
+    const parsedStructure = parseContentBlocks(nodes);
+
+    // Grouping specifically into "events" for backward compatibility or direct structured setups
+    const exportedEvents: any[] = [];
     let currentEvent: any = null;
 
-    const nodes = guide.content?.content || [];
-    nodes.forEach((block: any) => {
+    parsedStructure.forEach((block: any) => {
       if (block.type === "heading") {
-        const text = block.content
-          ?.map((c: any) => (c.type === "text" ? c.text : ""))
-          .join("");
         currentEvent = {
-          name: text,
+          name: block.text,
+          level: block.level,
           dataLayer: "",
           parameters: [],
+          elements: [] // all blocks belonging to this heading section
         };
-        events.push(currentEvent);
-      } else if (block.type === "codeBlock" && currentEvent) {
-        currentEvent.dataLayer = block.content
-          ?.map((c: any) => (c.type === "text" ? c.text : ""))
-          .join("");
-      } else if (block.type === "parameterTable" && currentEvent) {
-        const rows: ParameterRow[] = block.attrs?.rows ? JSON.parse(block.attrs.rows as string) : [];
-        currentEvent.parameters = rows.map(r => ({
-          param: r.parameter,
-          value: r.value,
-          type: r.type
-        }));
+        exportedEvents.push(currentEvent);
+      } else {
+        if (!currentEvent) {
+          // Fallback if there are blocks before any heading
+          currentEvent = {
+            name: "General",
+            level: 0,
+            dataLayer: "",
+            parameters: [],
+            elements: []
+          };
+          exportedEvents.push(currentEvent);
+        }
+        
+        // Associate nested content
+        currentEvent.elements.push(block);
+        if (block.type === "codeBlock") {
+          currentEvent.dataLayer = block.code;
+        } else if (block.type === "parameterTable") {
+          currentEvent.parameters = block.parameters;
+        }
       }
     });
 
     const exportData = {
       guide: guide.title,
       exportedAt: new Date().toISOString(),
-      events: events.filter(e => e.dataLayer || e.parameters.length > 0),
+      events: exportedEvents.map(e => ({
+        name: e.name,
+        level: e.level,
+        dataLayer: e.dataLayer || "",
+        parameters: e.parameters || [],
+        elements: e.elements || [] // Now includes paragraphs, subheadings, callouts, lists, etc.
+      })),
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -106,6 +251,8 @@ export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const toggleEdit = () => setIsEditing(!isEditing);
 
   if (!guide) return null;
 
@@ -146,8 +293,15 @@ export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown
             onClick={handleExportJSON}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
           >
-            <Code size={18} />
+            <Download size={18} />
             Exportar JSON
+          </button>
+          {/* Edit / Publish toggle button */}
+          <button
+            onClick={toggleEdit}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+          >
+            {isEditing ? 'Publicar' : 'Editar'}
           </button>
         </div>
       </header>
@@ -157,19 +311,25 @@ export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown
         <main className="flex-grow p-4 md:p-8 print:p-0 overflow-y-auto">
           <div className="max-w-[1000px] mx-auto bg-white min-h-[11in] shadow-sm rounded-xl overflow-hidden border border-slate-200 print:shadow-none print:border-none print:m-0 print:max-w-none">
             <div className="p-8 md:p-12 print:p-0">
-              <input
-                type="text"
-                value={guide.title}
-                onChange={handleTitleChange}
-                placeholder="Título de la guía..."
-                className="w-full text-5xl font-extrabold text-slate-900 border-none outline-none mb-8 placeholder:text-slate-200 bg-transparent"
-              />
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={guide.title}
+                  onChange={handleTitleChange}
+                  placeholder="Título de la guía..."
+                  className="w-full text-5xl font-extrabold text-slate-900 border-none outline-none mb-8 placeholder:text-slate-200 bg-transparent"
+                />
+              ) : (
+                <h1 className="text-5xl font-extrabold text-slate-900 mb-8">{guide.title || "Sin título"}</h1>
+              )}
 
               <ErrorBoundary>
                 <TiptapEditor
+                  key={guide.id}
                   initialContent={guide.content}
                   initialMarkdown={initialMarkdown}
                   onChange={handleContentChange}
+                  editable={isEditing}
                 />
               </ErrorBoundary>
             </div>
@@ -216,7 +376,6 @@ export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown
               </div>
               <TableOfContents 
                 content={guide.content || {}} 
-                onItemClick={() => {}}
               />
             </aside>
           </>
