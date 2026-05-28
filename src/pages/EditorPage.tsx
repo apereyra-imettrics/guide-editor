@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FileDown, Download, ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { FileDown, Download, Save, ArrowLeft, PanelRightClose, PanelRightOpen, ChevronDown } from "lucide-react";
+import { Menu } from "@mantine/core";
 import { TiptapEditor } from "../components/Editor/TiptapEditor";
 import { TableOfContents } from "../components/Editor/TableOfContents";
 import type { Guide, ParameterRow } from "../types";
 import { storage } from "../services/storage";
+import { exportGuideAsBackup } from "../services/markdownExporter";
 import debounce from "lodash.debounce";
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
@@ -71,6 +73,17 @@ export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown
 
   const handleExportPDF = () => {
     window.print();
+  };
+
+  const handleSaveBackup = () => {
+    if (!guide) return;
+    const result = exportGuideAsBackup(guide.id);
+    if (!result) return;
+    const a = document.createElement("a");
+    a.href = result.url;
+    a.download = result.filename;
+    a.click();
+    URL.revokeObjectURL(result.url);
   };
 
   const handleExportJSON = () => {
@@ -282,20 +295,36 @@ export const EditorPage: React.FC<EditorPageProps> = ({ guideId, initialMarkdown
             <span>Índice</span>
           </button>
           <div className="h-6 w-[1px] bg-slate-200 mx-1" />
-          <button
-            onClick={handleExportPDF}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            <FileDown size={18} />
-            Exportar PDF
-          </button>
-          <button
-            onClick={handleExportJSON}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <Download size={18} />
-            Exportar JSON
-          </button>
+          <Menu shadow="md" width={210} position="bottom-end">
+            <Menu.Target>
+              <button className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                <Download size={18} />
+                Exportar guía
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<Save size={15} />}
+                onClick={handleSaveBackup}
+              >
+                Guardar copia (.json)
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<Download size={15} />}
+                onClick={handleExportJSON}
+              >
+                Exportar JSON
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Item
+                leftSection={<FileDown size={15} />}
+                onClick={handleExportPDF}
+              >
+                Exportar PDF
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
           {/* Edit / Publish toggle button */}
           <button
             onClick={toggleEdit}

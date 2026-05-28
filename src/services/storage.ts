@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import type { Folder, Guide, GuideStore } from "../types";
+import type { GuideBackup } from "./markdownExporter";
 
 
 const STORAGE_KEY = "ga4_measurement_guides";
@@ -168,5 +169,25 @@ export const storage = {
       
       return newFolder;
     }
-  }
+  },
+
+  /**
+   * Import a guide from a backup object.
+   * Always assigns a fresh ID to avoid collisions with existing guides.
+   * Returns the newly created guide.
+   */
+  importGuideFromBackup(backup: GuideBackup, targetFolderId?: string | null): Guide {
+    const store = this.getStore();
+    const newGuide: Guide = {
+      id: uuidv4(),
+      title: backup.title,
+      folderId: targetFolderId !== undefined ? targetFolderId : backup.folderId,
+      content: backup.content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    store.guides.push(newGuide);
+    this.saveStore(store);
+    return newGuide;
+  },
 };
